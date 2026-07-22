@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "pesaje.registrado.v1",
+  "type": "object",
+  "required": ["event_id", "event_type", "version", "sitio_id", "occurred_at", "data"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "pesaje.registrado"},
+    "version": {"const": 1},
+    "sitio_id": {"type": "string"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "trace_id": {"type": "string"},
+    "data": {
+      "type": "object",
+      "required": ["lote_id", "instrumento_id", "masa_kg", "medido_en"],
+      "properties": {
+        "lote_id": {"type": "string", "format": "uuid"},
+        "movimiento_id": {"type": ["string", "null"]},
+        "instrumento_id": {"type": "string"},
+        "masa_kg": {"type": "number", "exclusiveMinimum": 0},
+        "medido_en": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

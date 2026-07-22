@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Configuración local / secretos
+.env
+*.local
+
+# Artefactos de ejecución local (outbox, auditoría, tokens, colas)
+.local-run/
+
+# IDE / editores
+.vscode/
+.idea/
+*.swp
+
+# SO
+Thumbs.db
+.DS_Store

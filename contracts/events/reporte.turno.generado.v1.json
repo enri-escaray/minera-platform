@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "reporte.turno.generado.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "version",
+    "sitio_id",
+    "occurred_at",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "const": "reporte.turno.generado"
+    },
+    "version": {
+      "const": 1
+    },
+    "sitio_id": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "fecha",
+        "turno",
+        "total_toneladas",
+        "cantidad_pesajes"
+      ],
+      "properties": {
+        "fecha": {
+          "type": "string"
+        },
+        "turno": {
+          "type": "string"
+        },
+        "total_toneladas": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cantidad_pesajes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

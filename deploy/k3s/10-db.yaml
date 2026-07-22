@@ -1,0 +1,38 @@
+# PostgreSQL+Timescale con réplica síncrona local (ADR-002: CP dentro del sitio).
+# Para HA real en sitio usar el operador CloudNativePG con 2 réplicas síncronas;
+# este StatefulSet simple es el punto de partida de un sitio chico.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: db, namespace: minera-sitio }
+spec:
+  serviceName: db
+  replicas: 1
+  selector: { matchLabels: { app: db } }
+  template:
+    metadata: { labels: { app: db } }
+    spec:
+      containers:
+        - name: postgres
+          image: timescale/timescaledb:latest-pg16
+          ports: [{ containerPort: 5432 }]
+          envFrom: [{ secretRef: { name: minera-secretos } }]
+          env:
+            - { name: POSTGRES_USER, value: minera }
+            - { name: POSTGRES_DB, value: sitio }
+          volumeMounts:
+            - { name: datos, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "minera", "-d", "sitio"] }
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata: { name: datos }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 100Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: db, namespace: minera-sitio }
+spec:
+  selector: { app: db }
+  ports: [{ port: 5432 }]

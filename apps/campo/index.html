@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campo — Novedades de turno</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 16px; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input, select, textarea, button { width: 100%; padding: 10px; margin-top: 4px; font-size: 16px; box-sizing: border-box; }
+    button { margin-top: 16px; font-weight: 700; cursor: pointer; }
+    #estado { margin-top: 12px; padding: 8px; border-radius: 6px; }
+    .ok { background: #e6f4ea; } .pendiente { background: #fef7e0; }
+    #cola { font-size: 14px; opacity: .8; }
+  </style>
+</head>
+<body>
+  <h1>Novedades de turno</h1>
+  <p id="conexion"></p>
+  <label>Fecha <input type="date" id="fecha"></label>
+  <label>Turno
+    <select id="turno"><option value="dia">Día</option><option value="noche">Noche</option></select>
+  </label>
+  <label>Categoría
+    <select id="categoria">
+      <option value="seguridad">Seguridad</option>
+      <option value="operacion">Operación</option>
+      <option value="equipo">Equipo</option>
+      <option value="otro">Otro</option>
+    </select>
+  </label>
+  <label>Novedad <textarea id="texto" rows="4" placeholder="Qué pasó, dónde, qué se hizo"></textarea></label>
+  <label>Token de acceso <input type="password" id="token" placeholder="pegar token del turno"></label>
+  <button id="enviar">Guardar novedad</button>
+  <div id="estado" hidden></div>
+  <p id="cola"></p>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

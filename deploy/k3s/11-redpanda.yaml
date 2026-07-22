@@ -1,0 +1,35 @@
+# Bus de eventos del sitio. En prod: 3 réplicas (una por nodo del clúster edge)
+# con anti-affinity, para que el bus sobreviva la caída de un nodo completo.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: redpanda, namespace: minera-sitio }
+spec:
+  serviceName: redpanda
+  replicas: 3
+  selector: { matchLabels: { app: redpanda } }
+  template:
+    metadata: { labels: { app: redpanda } }
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: { matchLabels: { app: redpanda } }
+      containers:
+        - name: redpanda
+          image: redpandadata/redpanda:latest
+          args: ["redpanda", "start", "--smp", "1", "--memory", "1G"]
+          ports: [{ containerPort: 9092 }]
+          volumeMounts: [{ name: datos, mountPath: /var/lib/redpanda/data }]
+  volumeClaimTemplates:
+    - metadata: { name: datos }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 50Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redpanda, namespace: minera-sitio }
+spec:
+  selector: { app: redpanda }
+  ports: [{ port: 9092 }]
