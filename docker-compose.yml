@@ -1,0 +1,97 @@
+# Entorno de desarrollo: simula un "sitio" completo en una máquina.
+# Modo isla se prueba pausando redpanda: docker compose pause redpanda
+x-auth-y-sitio: &auth_y_sitio
+  SITIO_ID: sitio-dev
+  AUTH_MODE: dev
+  AUTH_SECRET: dev-secret       # solo dev; en prod AUTH_MODE=oidc + OIDC_JWKS_URL
+  OUTBOX_DIR: /var/outbox
+  AUDIT_DIR: /var/auditoria
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: minera
+      POSTGRES_PASSWORD: minera-dev   # solo dev; en prod: secretos gestionados
+      POSTGRES_DB: sitio
+    ports: ["5432:5432"]
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minera -d sitio"]
+      interval: 5s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command: redpanda start --overprovisioned --smp 1 --memory 512M --reserve-memory 0M --node-id 0 --check=false --kafka-addr PLAINTEXT://0.0.0.0:9092 --advertise-kafka-addr PLAINTEXT://redpanda:9092
+    ports: ["9092:9092"]
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports: ["1883:1883"]
+    command: mosquitto -c /mosquitto-no-auth.conf   # dev sin auth; prod exige TLS+usuarios
+
+  trazabilidad:
+    build: { context: ., dockerfile: services/trazabilidad/Dockerfile }
+    environment:
+      <<: *auth_y_sitio
+      DATABASE_URL: postgresql://minera:minera-dev@db:5432/sitio
+      AUTH_MODE: dev
+      AUTH_SECRET: dev-secret       # solo dev; en prod AUTH_MODE=oidc + OIDC_JWKS_URL
+      OUTBOX_DIR: /var/outbox
+      AUDIT_DIR: /var/auditoria
+    ports: ["8000:8000"]
+    volumes: [outbox:/var/outbox, auditoria:/var/auditoria]
+    depends_on:
+      db: { condition: service_healthy }
+
+  ingesta:
+    build: { context: ., dockerfile: services/ingesta/Dockerfile }
+    environment:
+      SITIO_ID: sitio-dev
+      COLA_PATH: /var/cola/eventos.db
+      OUTBOX_DIR: /var/outbox
+      MQTT_HOST: mqtt
+      KAFKA_BOOTSTRAP: redpanda:9092
+    volumes: [cola:/var/cola, outbox:/var/outbox]
+    ports: ["8001:8001"]
+    depends_on: [mqtt, redpanda]
+
+  mantenimiento:
+    build: { context: ., dockerfile: services/mantenimiento/Dockerfile }
+    environment:
+      <<: *auth_y_sitio
+      KAFKA_BOOTSTRAP: redpanda:9092
+    volumes: [outbox:/var/outbox, auditoria:/var/auditoria]
+    ports: ["8002:8002"]
+    depends_on: [redpanda]
+
+  despacho:
+    build: { context: ., dockerfile: services/despacho/Dockerfile }
+    environment:
+      <<: *auth_y_sitio
+    volumes: [outbox:/var/outbox, auditoria:/var/auditoria]
+    ports: ["8003:8003"]
+
+  reportes:
+    build: { context: ., dockerfile: services/reportes/Dockerfile }
+    environment:
+      <<: *auth_y_sitio
+      TRAZABILIDAD_URL: http://trazabilidad:8000
+      CORS_ORIGINS: http://localhost:8080   # origen de app-campo (PWA)
+    volumes: [outbox:/var/outbox, auditoria:/var/auditoria]
+    ports: ["8004:8004"]
+    depends_on: [trazabilidad]
+
+  app-campo:
+    image: nginx:alpine
+    volumes: ["./apps/campo:/usr/share/nginx/html:ro"]
+    ports: ["8080:80"]
+
+volumes:
+  dbdata:
+  outbox:
+  cola:
+  auditoria:

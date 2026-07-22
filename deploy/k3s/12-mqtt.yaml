@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mqtt, namespace: minera-sitio }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mqtt } }
+  template:
+    metadata: { labels: { app: mqtt } }
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2
+          ports: [{ containerPort: 1883 }]
+          # Prod: montar mosquitto.conf con TLS y usuarios; este default es dev.
+          args: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mqtt, namespace: minera-sitio }
+spec:
+  selector: { app: mqtt }
+  ports: [{ port: 1883 }]

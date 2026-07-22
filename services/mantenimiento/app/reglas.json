@@ -1,0 +1,54 @@
+[
+  {
+    "id": "vibracion-motor-alta",
+    "metrica": "vibracion_rms",
+    "umbral": 7.1,
+    "ventana_n": 3,
+    "prioridad": "alta",
+    "diagnostico": "Vibración RMS sostenida sobre 7.1 mm/s (ISO 10816 zona C): posible desalineación o rodamiento en degradación",
+    "repuestos_sugeridos": [
+      "rodamiento-22320",
+      "kit-alineacion"
+    ]
+  },
+  {
+    "id": "temp-hidraulico-critica",
+    "metrica": "temp_hidraulico_c",
+    "umbral": 95.0,
+    "ventana_n": 2,
+    "prioridad": "critica",
+    "diagnostico": "Temperatura de aceite hidráulico sostenida sobre 95°C: riesgo de degradación del fluido y daño de bomba",
+    "repuestos_sugeridos": [
+      "filtro-hidraulico-hf35",
+      "aceite-iso68"
+    ]
+  },
+  {
+    "id": "presion-neumatico-baja",
+    "metrica": "presion_neumatico_psi",
+    "umbral": 85.0,
+    "condicion": "menor",
+    "ventana_n": 5,
+    "prioridad": "media",
+    "diagnostico": "Presión de neumático sostenida bajo 85 psi: riesgo de daño de carcasa y sobrecalentamiento",
+    "repuestos_sugeridos": [
+      "kit-valvula-neumatico"
+    ]
+  },
+  {
+    "id": "sobrecarga-a-velocidad",
+    "metrica": "carga_ton",
+    "umbral": 240.0,
+    "condicion": "mayor",
+    "ventana_n": 3,
+    "condiciones_adicionales": {
+      "velocidad_kmh": {
+        "umbral": 25.0,
+        "condicion": "mayor"
+      }
+    },
+    "prioridad": "alta",
+    "diagnostico": "Sobrecarga sostenida (>240 t) circulando a más de 25 km/h: fatiga acelerada de chasis y suspensiones",
+    "repuestos_sugeridos": []
+  }
+]

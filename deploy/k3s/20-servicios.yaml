@@ -1,0 +1,143 @@
+# Los cuatro servicios de dominio del sitio. Réplicas: 2 para APIs sin estado
+# (trazabilidad, despacho, mantenimiento) con anti-affinity suave; ingesta es 1
+# (posee la cola SQLite en PVC — escritor único por diseño del store-and-forward).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: trazabilidad, namespace: minera-sitio }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: trazabilidad } }
+  template:
+    metadata: { labels: { app: trazabilidad } }
+    spec:
+      affinity: &anti_afinidad
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector: { matchLabels: { app: trazabilidad } }
+      containers:
+        - name: app
+          image: registry.interno/minera/trazabilidad:0.1.0
+          ports: [{ containerPort: 8000 }]
+          envFrom: [{ secretRef: { name: minera-secretos } }]
+          env:
+            - { name: SITIO_ID, value: sitio-01 }
+            - { name: AUTH_MODE, value: oidc }
+            - { name: OUTBOX_DIR, value: /var/outbox }
+          volumeMounts: [{ name: outbox, mountPath: /var/outbox }]
+          readinessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 15 }
+      volumes:
+        - name: outbox
+          persistentVolumeClaim: { claimName: outbox-compartida }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: trazabilidad, namespace: minera-sitio }
+spec: { selector: { app: trazabilidad }, ports: [{ port: 8000 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: ingesta, namespace: minera-sitio }
+spec:
+  replicas: 1          # escritor único de la cola persistente
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: ingesta } }
+  template:
+    metadata: { labels: { app: ingesta } }
+    spec:
+      containers:
+        - name: app
+          image: registry.interno/minera/ingesta:0.1.0
+          ports: [{ containerPort: 8001 }]
+          env:
+            - { name: SITIO_ID, value: sitio-01 }
+            - { name: COLA_PATH, value: /var/cola/eventos.db }
+            - { name: OUTBOX_DIR, value: /var/outbox }
+            - { name: MQTT_HOST, value: mqtt }
+            - { name: KAFKA_BOOTSTRAP, value: "redpanda:9092" }
+          volumeMounts:
+            - { name: cola, mountPath: /var/cola }
+            - { name: outbox, mountPath: /var/outbox }
+          readinessProbe: { httpGet: { path: /health, port: 8001 }, periodSeconds: 5 }
+      volumes:
+        - name: cola
+          persistentVolumeClaim: { claimName: cola-ingesta }
+        - name: outbox
+          persistentVolumeClaim: { claimName: outbox-compartida }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: ingesta, namespace: minera-sitio }
+spec: { selector: { app: ingesta }, ports: [{ port: 8001 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mantenimiento, namespace: minera-sitio }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: mantenimiento } }
+  template:
+    metadata: { labels: { app: mantenimiento } }
+    spec:
+      containers:
+        - name: app
+          image: registry.interno/minera/mantenimiento:0.1.0
+          ports: [{ containerPort: 8002 }]
+          envFrom: [{ secretRef: { name: minera-secretos } }]
+          env:
+            - { name: SITIO_ID, value: sitio-01 }
+            - { name: AUTH_MODE, value: oidc }
+            - { name: KAFKA_BOOTSTRAP, value: "redpanda:9092" }
+            - { name: OUTBOX_DIR, value: /var/outbox }
+            - { name: AUDIT_DIR, value: /var/auditoria }
+          volumeMounts:
+            - { name: outbox, mountPath: /var/outbox }
+            - { name: auditoria, mountPath: /var/auditoria }
+          readinessProbe: { httpGet: { path: /health, port: 8002 }, periodSeconds: 5 }
+      volumes:
+        - name: outbox
+          persistentVolumeClaim: { claimName: outbox-compartida }
+        - name: auditoria
+          persistentVolumeClaim: { claimName: auditoria-compartida }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mantenimiento, namespace: minera-sitio }
+spec: { selector: { app: mantenimiento }, ports: [{ port: 8002 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: despacho, namespace: minera-sitio }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: despacho } }
+  template:
+    metadata: { labels: { app: despacho } }
+    spec:
+      containers:
+        - name: app
+          image: registry.interno/minera/despacho:0.1.0
+          ports: [{ containerPort: 8003 }]
+          envFrom: [{ secretRef: { name: minera-secretos } }]
+          env:
+            - { name: SITIO_ID, value: sitio-01 }
+            - { name: AUTH_MODE, value: oidc }
+            - { name: OUTBOX_DIR, value: /var/outbox }
+            - { name: AUDIT_DIR, value: /var/auditoria }
+          volumeMounts:
+            - { name: outbox, mountPath: /var/outbox }
+            - { name: auditoria, mountPath: /var/auditoria }
+          readinessProbe: { httpGet: { path: /health, port: 8003 }, periodSeconds: 5 }
+      volumes:
+        - name: outbox
+          persistentVolumeClaim: { claimName: outbox-compartida }
+        - name: auditoria
+          persistentVolumeClaim: { claimName: auditoria-compartida }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: despacho, namespace: minera-sitio }
+spec: { selector: { app: despacho }, ports: [{ port: 8003 }] }

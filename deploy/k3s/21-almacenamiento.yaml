@@ -1,0 +1,21 @@
+# PVCs compartidos (RWX): en K3s usar longhorn o nfs-provisioner del clúster edge.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: outbox-compartida, namespace: minera-sitio }
+spec:
+  accessModes: [ReadWriteMany]
+  resources: { requests: { storage: 10Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: auditoria-compartida, namespace: minera-sitio }
+spec:
+  accessModes: [ReadWriteMany]
+  resources: { requests: { storage: 20Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: cola-ingesta, namespace: minera-sitio }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }

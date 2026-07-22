@@ -1,0 +1,56 @@
+# Denegación por defecto dentro del namespace (regla 7 del CLAUDE.md):
+# nada habla con nada salvo lo declarado. Los conductos C1-C4 de
+# docs/arquitectura.md se materializan acá.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: denegar-todo, namespace: minera-sitio }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: servicios-a-db, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: db } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: trazabilidad } }
+      ports: [{ port: 5432 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: servicios-a-redpanda, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: redpanda } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: ingesta } }
+        - podSelector: { matchLabels: { app: mantenimiento } }
+        - podSelector: { matchLabels: { app: replicador } }
+      ports: [{ port: 9092 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: sensores-a-mqtt, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: mqtt } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: ingesta } }
+      ports: [{ port: 1883 }]
+    # Los gateways de sensores entran por el LoadBalancer del clúster con
+    # ipBlock de la VLAN OT autorizada (conducto C1); definir el CIDR del sitio:
+    - from:
+        - ipBlock: { cidr: 10.20.0.0/24 }
+      ports: [{ port: 1883 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: reportes-a-trazabilidad, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: trazabilidad } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: reportes } }
+      ports: [{ port: 8000 }]

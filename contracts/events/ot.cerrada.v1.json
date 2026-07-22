@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ot.cerrada.v1",
+  "type": "object",
+  "required": ["event_id", "event_type", "version", "sitio_id", "occurred_at", "data"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "ot.cerrada"},
+    "version": {"const": 1},
+    "sitio_id": {"type": "string"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "trace_id": {"type": "string"},
+    "data": {
+      "type": "object",
+      "required": ["ot_id", "equipo_id", "resolucion"],
+      "properties": {
+        "ot_id": {"type": "string", "format": "uuid"},
+        "equipo_id": {"type": "string"},
+        "resolucion": {"type": "string"}
+      }
+    }
+  }
+}

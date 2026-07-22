@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "conciliacion.alerta.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "version",
+    "sitio_id",
+    "occurred_at",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "const": "conciliacion.alerta"
+    },
+    "version": {
+      "const": 1
+    },
+    "sitio_id": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "lote_id",
+        "masa_entrada_kg",
+        "masa_salida_kg",
+        "desvio_pct",
+        "detalle"
+      ],
+      "properties": {
+        "lote_id": {
+          "type": "string"
+        },
+        "masa_entrada_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "masa_salida_kg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "desvio_pct": {
+          "type": "number",
+          "minimum": 0
+        },
+        "detalle": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

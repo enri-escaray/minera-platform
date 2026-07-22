@@ -1,0 +1,44 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  contratos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema
+      - run: python tools/validar_contratos.py
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        servicio: [trazabilidad, ingesta, mantenimiento, despacho, reportes]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e libs/comun
+      - run: pip install -r services/${{ matrix.servicio }}/requirements.txt
+      - run: cd services/${{ matrix.servicio }} && python -m pytest -q
+
+  migraciones:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:latest-pg16
+        env: { POSTGRES_USER: minera, POSTGRES_PASSWORD: ci, POSTGRES_DB: sitio }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U minera -d sitio" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: aplicar migraciones en orden
+        run: |
+          for m in db/migrations/*.sql; do
+            PGPASSWORD=ci psql -h localhost -U minera -d sitio -v ON_ERROR_STOP=1 -f "$m"
+          done

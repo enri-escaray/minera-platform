@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bloque.importado.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "version",
+    "sitio_id",
+    "occurred_at",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "const": "bloque.importado"
+    },
+    "version": {
+      "const": 1
+    },
+    "sitio_id": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "origen_modelo",
+        "cantidad",
+        "comando_event_id"
+      ],
+      "properties": {
+        "origen_modelo": {
+          "type": "string"
+        },
+        "cantidad": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comando_event_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
