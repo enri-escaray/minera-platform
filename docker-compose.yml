@@ -80,7 +80,7 @@ services:
     environment:
       <<: *auth_y_sitio
       TRAZABILIDAD_URL: http://trazabilidad:8000
-      CORS_ORIGINS: http://localhost:8080   # origen de app-campo (PWA)
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8081   # app-campo (PWA) + panel
     volumes: [outbox:/var/outbox, auditoria:/var/auditoria]
     ports: ["8004:8004"]
     depends_on: [trazabilidad]
@@ -89,6 +89,11 @@ services:
     image: nginx:alpine
     volumes: ["./apps/campo:/usr/share/nginx/html:ro"]
     ports: ["8080:80"]
+
+  panel:
+    image: nginx:alpine
+    volumes: ["./apps/panel:/usr/share/nginx/html:ro"]
+    ports: ["8081:80"]
 
 volumes:
   dbdata:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -46,6 +47,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Despacho", version="0.1.0", lifespan=lifespan)
+
+# Panel de sitio (apps/panel): solo consultas, mismo patrón de CORS que reportes.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 _STATUS = {EquipoNoExiste: 404, CamionNoDisponible: 409, SinPalasDisponibles: 409}
 

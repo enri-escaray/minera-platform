@@ -107,6 +107,15 @@ def test_importar_bloques_upsert(client):
     assert r.status_code == 403
 
 
+def test_listar_lotes_para_panel(client, token_operador):
+    crear_lote(client, token_operador, codigo="LT-PANEL-1")
+    crear_lote(client, token_operador, codigo="LT-PANEL-2")
+    r = client.get("/lotes")  # lectura pública: la consume el panel de sitio
+    assert r.status_code == 200
+    codigos = [l["codigo"] for l in r.json()]
+    assert "LT-PANEL-1" in codigos and "LT-PANEL-2" in codigos
+
+
 def test_listar_pesajes_por_rango(client, token_operador):
     lote = crear_lote(client, token_operador, codigo="LT-RANGO")
     for hora, masa in (("08", 100.0), ("12", 200.0), ("20", 300.0)):

@@ -29,6 +29,7 @@ class Repo(Protocol):
     async def registrar_pesaje(self, cmd: RegistrarPesaje) -> tuple[Pesaje, bool]: ...
     async def pesajes_de(self, lote_id: UUID) -> list[Pesaje]: ...
     async def listar_pesajes(self, desde: datetime, hasta: datetime) -> list[Pesaje]: ...
+    async def listar_lotes(self) -> list[Lote]: ...
     async def guardar_bloques(self, origen_modelo: str, bloques: list[Bloque]) -> int: ...
 
 
@@ -88,6 +89,9 @@ class InMemoryRepo:
             (p for p in self._pesajes.values() if desde <= p.medido_en < hasta),
             key=lambda p: p.medido_en,
         )
+
+    async def listar_lotes(self) -> list[Lote]:
+        return sorted(self._lotes.values(), key=lambda l: l.creado_en, reverse=True)
 
     async def guardar_bloques(self, origen_modelo: str, bloques: list[Bloque]) -> int:
         for bloque in bloques:
@@ -178,6 +182,13 @@ class PostgresRepo:
                 "FROM trazabilidad.pesaje WHERE medido_en >= $1 AND medido_en < $2 "
                 "ORDER BY medido_en", desde, hasta)
             return [Pesaje(**dict(f)) for f in filas]
+
+    async def listar_lotes(self) -> list[Lote]:
+        async with self._pool.acquire() as con:
+            filas = await con.fetch(
+                "SELECT * FROM trazabilidad.lote_mineral ORDER BY creado_en DESC LIMIT 200"
+            )
+            return [await self._hidratar_lote(con, f) for f in filas]
 
     async def guardar_bloques(self, origen_modelo: str, bloques: list[Bloque]) -> int:
         import json
