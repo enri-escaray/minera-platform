@@ -1,0 +1,6 @@
+# Binarios: jamás normalizar fines de línea (un CRLF corrompe el archivo)
+*.pdf  binary
+*.pptx binary
+*.png  binary
+*.jpg  binary
+*.ico  binary
