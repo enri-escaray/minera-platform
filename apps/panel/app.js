@@ -79,8 +79,17 @@ async function verCustodia(loteId) {
   }
 }
 
+let custodiaInicialAbierta = false;
+
 async function pintarLotes() {
   const lotes = await consultar("trazabilidad", "/lotes");
+  // Enlace profundo: ?lote=CODIGO abre la cadena de custodia de ese lote al cargar.
+  if (!custodiaInicialAbierta) {
+    const codigo = new URLSearchParams(location.search).get("lote");
+    const elegido = codigo && lotes.find((l) => l.codigo === codigo);
+    if (elegido) verCustodia(elegido.id);
+    custodiaInicialAbierta = true;
+  }
   $("lotes").innerHTML = tabla(
     ["Código", "Tipo", "Estado", "Creado"],
     lotes.slice(0, 15).map((l) => [
