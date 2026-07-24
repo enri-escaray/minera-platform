@@ -29,7 +29,7 @@ log = logging.getLogger("reportes")
 TRAZABILIDAD_URL = os.getenv("TRAZABILIDAD_URL", "http://trazabilidad:8000")
 TOLERANCIA_CONCILIACION_PCT = float(os.getenv("TOLERANCIA_CONCILIACION_PCT", "2.0"))
 # Orígenes de la PWA de campo autorizados a llamar este servicio (CSV en env).
-CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8080").split(",") if o.strip()]
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8080,http://localhost:8081").split(",") if o.strip()]
 
 
 class FuentePesajes(Protocol):

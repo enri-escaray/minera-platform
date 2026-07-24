@@ -70,7 +70,9 @@ minera-platform/
 │   ├── mantenimiento/     ← flujo P1: telemetría → OTs predictivas (consumidor Kafka)
 │   ├── despacho/          ← asignación camión-pala (CP local, decisiones explicables)
 │   └── reportes/          ← flujos P2 (reporte de turno) y P4 (conciliación)
-├── apps/campo/            ← PWA offline-first para novedades de turno
+├── apps/
+│   ├── campo/             ← PWA offline-first para novedades de turno
+│   └── panel/             ← panel de sitio solo lectura (despacho, OTs, custodia, turno)
 ├── tools/                 ← adaptador CSV de bloques, validador de contratos (CI)
 ├── .github/workflows/     ← CI: 5 suites + contratos + migraciones
 ├── deploy/
@@ -168,6 +170,11 @@ python tools/validar_contratos.py
 - [x] CI (GitHub Actions): 5 suites en matriz + validación de contratos
       (`tools/validar_contratos.py`) + aplicación de migraciones contra Timescale real.
 - [x] Guía de puesta en marcha: `docs/puesta-en-marcha.md`.
+- [x] Panel de sitio solo lectura (`apps/panel/`, :8081): despacho en vivo con motivo
+      explicable de cada asignación, OTs, lotes con cadena de custodia navegable y
+      turno en curso. Sin escrituras: consume `GET /estado`, `GET /ots`, `GET /lotes`
+      (nuevo), `GET /lotes/{id}/custodia` y `GET /reportes/turno`. CORS de solo GET
+      en trazabilidad/mantenimiento/despacho (mismo patrón que reportes).
 
 ### Pendiente (siguiente iteración — sé honesto con esto al retomar)
 - [ ] Persistencia Postgres de novedades en `reportes` (hoy memoria; el evento ya viaja a nube)

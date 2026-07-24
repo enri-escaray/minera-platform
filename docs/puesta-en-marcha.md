@@ -12,8 +12,8 @@ docker compose up -d --build
 ```
 
 Servicios levantados: trazabilidad :8000, ingesta :8001, mantenimiento :8002,
-despacho :8003, reportes :8004, PWA de campo :8080, Postgres :5432,
-Redpanda :9092, MQTT :1883. Las migraciones de `db/migrations/` se aplican
+despacho :8003, reportes :8004, PWA de campo :8080, panel de sitio :8081,
+Postgres :5432, Redpanda :9092, MQTT :1883. Las migraciones de `db/migrations/` se aplican
 solas en el primer arranque de la base.
 
 Token de prueba con todos los roles:
@@ -35,6 +35,8 @@ for i in 1 2 3; do mosquitto_pub -h localhost -t 'telemetria/cam-101/vibracion_r
 curl localhost:8002/ots | jq
 # 3. Reporte de turno
 curl "localhost:8004/reportes/turno?fecha=2026-07-18&turno=dia" | jq
+#    (o abrir el panel de sitio en http://localhost:8081 — solo lectura:
+#     despacho en vivo, OTs, cadena de custodia por lote y turno en curso)
 # 4. Modo isla: docker compose pause redpanda → curl localhost:8001/health
 #    (la cola crece) → docker compose unpause redpanda → (drena sola)
 ```

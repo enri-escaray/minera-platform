@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from minera_comun import Principal, publicar_evento, requerir_rol
@@ -51,6 +52,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trazabilidad", version="0.1.0", lifespan=lifespan)
+
+# Panel de sitio (apps/panel): solo consultas, mismo patrón de CORS que reportes.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 @app.exception_handler(ErrorDominio)
@@ -114,6 +124,12 @@ async def importar_bloques(
          "comando_event_id": str(cmd.event_id)},
     )
     return {"importados": cantidad, "origen_modelo": cmd.origen_modelo}
+
+
+@app.get("/lotes", response_model=list[Lote])
+async def listar_lotes():
+    """Listado para el panel de sitio (más recientes primero, tope 200)."""
+    return await repo().listar_lotes()
 
 
 @app.get("/pesajes", response_model=list[Pesaje])

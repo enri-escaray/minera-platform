@@ -179,6 +179,7 @@ class Despachador:
                 "camiones": [c.model_dump() for c in self._camiones.values()],
                 "en_cola": dict(self._en_cola),
                 "asignaciones_vivas": len(self._asignacion_de),
+                "asignaciones": [a.model_dump() for a in self._asignacion_de.values()],
             }
 
     def _camion(self, camion_id: str) -> Camion:

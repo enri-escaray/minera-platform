@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de sitio — Operación minera</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --borde: #d0d4da; --sombra: rgba(0,0,0,.06);
+      --ok: #1e7e34; --alerta: #b26a00; --critico: #b02a37; --apagado: #6c757d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --borde: #3a3f46; --sombra: rgba(0,0,0,.4); }
+    }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px 20px; }
+    header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    h1 { font-size: 22px; margin: 0; }
+    #actualizado { font-size: 13px; opacity: .7; }
+    #servicios { display: flex; gap: 10px; margin-left: auto; font-size: 13px; flex-wrap: wrap; }
+    .svc::before { content: "●"; margin-right: 4px; }
+    .svc.arriba::before { color: var(--ok); }
+    .svc.abajo::before { color: var(--critico); }
+    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
+    section {
+      border: 1px solid var(--borde); border-radius: 10px; padding: 14px 16px;
+      box-shadow: 0 1px 3px var(--sombra); overflow-x: auto;
+    }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th { text-align: left; font-weight: 600; opacity: .7; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--borde); }
+    td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--borde); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .kpis { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
+    .kpi strong { display: block; font-size: 22px; }
+    .kpi span { font-size: 12px; opacity: .7; }
+    .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; color: #fff; }
+    .chip.abierta, .chip.mantenimiento { background: var(--critico); }
+    .chip.agendada, .chip.en_ciclo { background: var(--alerta); }
+    .chip.cerrada, .chip.disponible, .chip.activo { background: var(--ok); }
+    .chip.otro { background: var(--apagado); }
+    .vacio { opacity: .6; font-size: 14px; }
+    .motivo { font-size: 12px; opacity: .75; }
+    #custodia { white-space: normal; }
+    #custodia .nodo { border-left: 3px solid var(--borde); margin: 6px 0 6px 4px; padding: 2px 0 2px 10px; }
+    button.enlace { background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font-size: 14px; }
+    .error { color: var(--critico); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Panel de sitio</h1>
+    <span id="actualizado"></span>
+    <div id="servicios"></div>
+  </header>
+  <main>
+    <section>
+      <h2>Despacho — rajo ahora</h2>
+      <div id="despacho"></div>
+    </section>
+    <section>
+      <h2>Mantenimiento — órdenes de trabajo</h2>
+      <div id="ots"></div>
+    </section>
+    <section>
+      <h2>Trazabilidad — lotes recientes</h2>
+      <div id="lotes"></div>
+      <div id="custodia"></div>
+    </section>
+    <section>
+      <h2>Turno en curso</h2>
+      <div id="turno"></div>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
