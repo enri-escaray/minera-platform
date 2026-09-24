@@ -11,13 +11,20 @@ import os
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from minera_comun import Principal, publicar_evento, requerir_rol
+from minera_comun import (
+    Principal,
+    publicar_evento,
+    registrar_errores_de_validacion,
+    requerir_lectura,
+    requerir_rol,
+    verificar_configuracion,
+)
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .models import (
     ImportarBloques,
@@ -37,6 +44,8 @@ SITIO_ID = os.getenv("SITIO_ID", "sitio-dev")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fallo cerrado: con auth mal configurada el servicio no llega a 'ready'.
+    verificar_configuracion()
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         import asyncpg
@@ -52,6 +61,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trazabilidad", version="0.1.0", lifespan=lifespan)
+registrar_errores_de_validacion(app)
 
 # Panel de sitio (apps/panel): solo consultas, mismo patrón de CORS que reportes.
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",") if o.strip()]
@@ -126,28 +136,62 @@ async def importar_bloques(
     return {"importados": cantidad, "origen_modelo": cmd.origen_modelo}
 
 
+LECTURA = requerir_lectura("trazabilidad.leer", "trazabilidad.escribir")
+
+
 @app.get("/lotes", response_model=list[Lote])
-async def listar_lotes():
+async def listar_lotes(_=Depends(LECTURA)):
     """Listado para el panel de sitio (más recientes primero, tope 200)."""
     return await repo().listar_lotes()
 
 
 @app.get("/pesajes", response_model=list[Pesaje])
-async def listar_pesajes(desde: datetime, hasta: datetime):
+async def listar_pesajes(desde: datetime, hasta: datetime, _=Depends(LECTURA)):
     """Consulta por rango: la usa `reportes` para el reporte de turno (P2)."""
+    if hasta <= desde:
+        raise HTTPException(status_code=422, detail="'hasta' debe ser posterior a 'desde'")
+    if hasta - desde > MAX_RANGO_CONSULTA:
+        raise HTTPException(
+            status_code=422,
+            detail=f"rango máximo de consulta: {MAX_RANGO_CONSULTA.days} días",
+        )
     return await repo().listar_pesajes(desde, hasta)
 
 
-MAX_PROFUNDIDAD = 6  # límite defensivo para el grafo de custodia
+MAX_PROFUNDIDAD = 6      # límite defensivo para el grafo de custodia
+MAX_NODOS_CUSTODIA = 500  # techo total de lotes visitados por consulta
+MAX_RANGO_CONSULTA = timedelta(days=31)
 
 
-async def _custodia(lote_id: UUID, profundidad: int) -> CadenaCustodia:
+class _Presupuesto:
+    """Techo de nodos por consulta.
+
+    La profundidad sola no acota el trabajo: el grafo lo arma el usuario y un
+    rombo de mezclas (D viene de B y C, ambos de A) hace que la recursión
+    reexplore el mismo subárbol por cada camino. Con fan-out N y 6 niveles eso
+    es N^6 consultas a la base desde un solo GET. El presupuesto corta la
+    consulta antes de que un lote armado a propósito voltee el servicio.
+    """
+
+    def __init__(self, maximo: int) -> None:
+        self.restante = maximo
+
+    def consumir(self) -> bool:
+        if self.restante <= 0:
+            return False
+        self.restante -= 1
+        return True
+
+
+async def _custodia(lote_id: UUID, profundidad: int, presupuesto: _Presupuesto) -> CadenaCustodia:
     lote = await repo().obtener_lote(lote_id)
     pesajes = await repo().pesajes_de(lote_id)
     origenes: list[CadenaCustodia] = []
     if profundidad < MAX_PROFUNDIDAD:
         for origen_id in lote.lotes_origen:
-            origenes.append(await _custodia(origen_id, profundidad + 1))
+            if not presupuesto.consumir():
+                break  # respuesta truncada antes que servicio caído
+            origenes.append(await _custodia(origen_id, profundidad + 1, presupuesto))
     return CadenaCustodia(
         lote=lote,
         pesajes=pesajes,
@@ -157,6 +201,6 @@ async def _custodia(lote_id: UUID, profundidad: int) -> CadenaCustodia:
 
 
 @app.get("/lotes/{lote_id}/custodia", response_model=CadenaCustodia)
-async def cadena_custodia(lote_id: UUID):
+async def cadena_custodia(lote_id: UUID, _=Depends(LECTURA)):
     """Historia completa del lote: pesajes propios + recursión sobre sus orígenes."""
-    return await _custodia(lote_id, 0)
+    return await _custodia(lote_id, 0, _Presupuesto(MAX_NODOS_CUSTODIA))

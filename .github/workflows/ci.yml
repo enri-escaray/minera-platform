@@ -13,6 +13,17 @@ jobs:
       - run: pip install jsonschema
       - run: python tools/validar_contratos.py
 
+  # Borde de autenticación: los tests que fallan acá son puertas abiertas, no
+  # tests rotos. Corre antes que el resto para que el fallo sea inequívoco.
+  seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e libs/comun pytest httpx fastapi
+      - run: cd libs/comun && python -m pytest -q
+
   tests:
     runs-on: ubuntu-latest
     strategy:
@@ -25,6 +36,22 @@ jobs:
       - run: pip install -e libs/comun
       - run: pip install -r services/${{ matrix.servicio }}/requirements.txt
       - run: cd services/${{ matrix.servicio }} && python -m pytest -q
+
+  # Vulnerabilidades conocidas en dependencias. Informativo por ahora: que un CVE
+  # publicado hoy no frene un despliegue de mina, pero que nadie pueda decir que
+  # no se sabía.
+  dependencias:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pip-audit
+      - run: |
+          for s in trazabilidad ingesta mantenimiento despacho reportes; do
+            echo "== $s"; pip-audit -r services/$s/requirements.txt || true
+          done
 
   migraciones:
     runs-on: ubuntu-latest

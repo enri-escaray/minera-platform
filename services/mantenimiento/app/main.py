@@ -22,9 +22,17 @@ from uuid import UUID
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from minera_comun import Principal, auditar, publicar_evento, requerir_rol
+from minera_comun import (
+    Principal,
+    auditar,
+    publicar_evento,
+    registrar_errores_de_validacion,
+    requerir_lectura,
+    requerir_rol,
+    verificar_configuracion,
+)
 
 from .models import (
     ErrorDominio,
@@ -95,14 +103,23 @@ class KafkaFuente:
         if self._consumer is None:
             from aiokafka import AIOKafkaConsumer
 
-            self._consumer = AIOKafkaConsumer(
+            consumer = AIOKafkaConsumer(
                 self._topico,
                 bootstrap_servers=self._bootstrap,
                 group_id="mantenimiento",
                 enable_auto_commit=True,
                 auto_offset_reset="earliest",
             )
-            await self._consumer.start()
+            try:
+                await consumer.start()
+            except Exception:
+                # Broker aún no disponible (p. ej. arranque del sitio): dejar
+                # _consumer en None para que el próximo intento vuelva a start().
+                # Si quedara asignado sin arrancar, todos los getone() siguientes
+                # fallarían para siempre con el coordinador en None.
+                await consumer.stop()
+                raise
+            self._consumer = consumer
         msg = await self._consumer.getone()
         return json.loads(msg.value)
 
@@ -121,6 +138,8 @@ async def bucle_consumidor(fuente: FuenteEventos, evaluador: Evaluador, repo: Re
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fallo cerrado: con auth mal configurada el servicio no llega a 'ready'.
+    verificar_configuracion()
     app.state.evaluador = Evaluador(cargar_reglas(REGLAS_PATH))
     app.state.pool = None
     database_url = os.getenv("DATABASE_URL")
@@ -147,6 +166,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Mantenimiento", version="0.1.0", lifespan=lifespan)
+registrar_errores_de_validacion(app)
 
 # Panel de sitio (apps/panel): solo consultas, mismo patrón de CORS que reportes.
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",") if o.strip()]
@@ -170,7 +190,10 @@ async def health():
 
 
 @app.get("/ots", response_model=list[OrdenTrabajo])
-async def listar_ots(estado: EstadoOT | None = None):
+async def listar_ots(
+    estado: EstadoOT | None = None,
+    _=Depends(requerir_lectura("mantenimiento.leer", "mantenimiento.planificar", "mantenimiento.cerrar")),
+):
     return await app.state.repo.listar(estado)
 
 
@@ -190,7 +213,7 @@ async def agendar_ot(
 class CerrarOT(BaseModel):
     """Cuerpo mínimo del cierre; la resolución escrita es obligatoria."""
 
-    resolucion: str
+    resolucion: str = Field(min_length=1, max_length=4000)
 
 
 @app.post("/ots/{ot_id}/cerrar", response_model=OrdenTrabajo)

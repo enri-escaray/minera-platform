@@ -16,10 +16,11 @@ despacho :8003, reportes :8004, PWA de campo :8080, panel de sitio :8081,
 Postgres :5432, Redpanda :9092, MQTT :1883. Las migraciones de `db/migrations/` se aplican
 solas en el primer arranque de la base.
 
-Token de prueba con todos los roles:
+Token de prueba con todos los roles (vence en 1 hora; el rol `*` solo concede
+algo con `AUTH_MODE=dev`):
 ```bash
-pip install pyjwt && python -c "import os; os.environ['AUTH_SECRET']='dev-secret'; \
-from jwt import encode; print(encode({'sub':'admin','roles':['*']}, 'dev-secret', algorithm='HS256'))"
+pip install -e libs/comun && AUTH_SECRET=dev-secret-solo-para-desarrollo-local \
+python -c "from minera_comun import emitir_token_dev; print(emitir_token_dev('admin', ['*']))"
 ```
 
 Flujo completo de punta a punta:
@@ -45,9 +46,13 @@ curl "localhost:8004/reportes/turno?fecha=2026-07-18&turno=dia" | jq
 
 | Qué | Dónde | Valor |
 |---|---|---|
-| `AUTH_MODE` | todos los servicios | `oidc` (jamás `dev` fuera de desarrollo) |
+| `AUTH_MODE` | todos los servicios | `oidc` (jamás `dev` fuera de desarrollo). **Obligatorio: sin esta variable el servicio se niega a arrancar** |
 | `OIDC_JWKS_URL` | Secret `minera-secretos` | JWKS del realm de Keycloak/Entra |
-| `AUTH_SECRET` | eliminar | no se usa en modo oidc |
+| `OIDC_AUDIENCE` | todos los servicios | identificador de la app en el IdP; sin él se aceptaría un token emitido para otro cliente del mismo realm |
+| `OIDC_ISSUER` | todos los servicios | emisor esperado (`https://…/realms/minera`) |
+| `AUTH_LECTURA` | todos los servicios | `exigir`: cierra también las consultas (cadena de custodia = dato regulatorio) |
+| `SERVICIO_TOKEN` | Secret, servicio `reportes` | credencial propia para consultar `/pesajes` con la lectura cerrada |
+| `AUTH_SECRET` | eliminar | no se usa en modo oidc; dejarlo suelto es una vía de emisión de tokens sin supervisión |
 | `DATABASE_URL` | Secret | credenciales reales, usuario por servicio |
 | `SITIO_ID` | por sitio | único y estable (`sitio-01`, `sitio-02`, …) — prefija los tópicos en nube |
 | Contraseñas MQTT + TLS | mosquitto.conf | obligatorio: los sensores autentican |

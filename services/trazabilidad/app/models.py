@@ -23,13 +23,19 @@ class EstadoLote(str, Enum):
     cerrado = "cerrado"
 
 
+MAX_LOTES_ORIGEN = 100   # una mezcla real combina decenas de lotes, no miles
+MAX_BLOQUES_POR_IMPORT = 50_000
+
+
 class CrearLote(BaseModel):
     """Comando de creación. event_id garantiza idempotencia del comando."""
     event_id: UUID = Field(default_factory=uuid4)
     codigo: str = Field(min_length=3, max_length=64)
     tipo: TipoLote
     disparo_id: UUID | None = None
-    lotes_origen: list[UUID] = Field(default_factory=list)
+    # Acotado: el grafo de custodia se recorre recursivamente y un fan-out sin
+    # techo convierte una consulta de custodia en una amplificación contra la base.
+    lotes_origen: list[UUID] = Field(default_factory=list, max_length=MAX_LOTES_ORIGEN)
 
     @field_validator("lotes_origen")
     @classmethod
@@ -53,8 +59,8 @@ class RegistrarPesaje(BaseModel):
     """El event_id es la clave de idempotencia: reintentos no duplican masa."""
     event_id: UUID
     lote_id: UUID
-    instrumento_id: str
-    masa_kg: float = Field(gt=0)
+    instrumento_id: str = Field(min_length=1, max_length=64)
+    masa_kg: float = Field(gt=0, le=1_000_000)  # 1000 t: ningún pesaje real lo supera
     medido_en: datetime
     movimiento_id: UUID | None = None
 
@@ -71,11 +77,11 @@ class Pesaje(BaseModel):
 class Bloque(BaseModel):
     """Celda del modelo de bloques importada desde el software geológico."""
 
-    id: str
+    id: str = Field(min_length=1, max_length=64)
     centroide_x: float
     centroide_y: float
     cota: float
-    leyes_estimadas: dict[str, float]
+    leyes_estimadas: dict[str, float] = Field(max_length=32)
 
 
 class ImportarBloques(BaseModel):
@@ -86,8 +92,10 @@ class ImportarBloques(BaseModel):
     """
 
     event_id: UUID = Field(default_factory=uuid4)
-    origen_modelo: str = Field(min_length=1)
-    bloques: list[Bloque] = Field(min_length=1)
+    origen_modelo: str = Field(min_length=1, max_length=128)
+    # Un modelo de bloques completo se importa por lotes, no en un solo POST:
+    # sin techo, un import es una carga arbitraria de memoria y de transacción.
+    bloques: list[Bloque] = Field(min_length=1, max_length=MAX_BLOQUES_POR_IMPORT)
 
 
 class CadenaCustodia(BaseModel):

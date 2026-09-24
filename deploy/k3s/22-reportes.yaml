@@ -7,26 +7,46 @@ spec:
   template:
     metadata: { labels: { app: reportes } }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
           image: registry.interno/minera/reportes:0.1.0
           ports: [{ containerPort: 8004 }]
+          # El secreto aporta OIDC_JWKS_URL y SERVICIO_TOKEN (credencial propia
+          # para consultar /pesajes en trazabilidad, que con AUTH_LECTURA=exigir
+          # ya no responde anónimo). Nunca en el manifiesto.
           envFrom: [{ secretRef: { name: minera-secretos } }]
           env:
             - { name: SITIO_ID, value: sitio-01 }
             - { name: AUTH_MODE, value: oidc }
+            - { name: OIDC_AUDIENCE, value: minera-sitio }
+            - { name: OIDC_ISSUER, value: "https://keycloak.interno/realms/minera" }
+            - { name: AUTH_LECTURA, value: exigir }
             - { name: TRAZABILIDAD_URL, value: "http://trazabilidad:8000" }
             - { name: OUTBOX_DIR, value: /var/outbox }
             - { name: AUDIT_DIR, value: /var/auditoria }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
           volumeMounts:
             - { name: outbox, mountPath: /var/outbox }
             - { name: auditoria, mountPath: /var/auditoria }
+            - { name: tmp, mountPath: /tmp }
           readinessProbe: { httpGet: { path: /health, port: 8004 }, periodSeconds: 5 }
       volumes:
         - name: outbox
           persistentVolumeClaim: { claimName: outbox-compartida }
         - name: auditoria
           persistentVolumeClaim: { claimName: auditoria-compartida }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service

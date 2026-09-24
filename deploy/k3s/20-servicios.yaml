@@ -1,6 +1,14 @@
 # Los cuatro servicios de dominio del sitio. Réplicas: 2 para APIs sin estado
 # (trazabilidad, despacho, mantenimiento) con anti-affinity suave; ingesta es 1
 # (posee la cola SQLite en PVC — escritor único por diseño del store-and-forward).
+#
+# Endurecimiento común (ver también deploy/k3s/README.md):
+# - runAsNonRoot + uid 10001: el mismo usuario que crean los Dockerfiles.
+# - readOnlyRootFilesystem: el código no se modifica en runtime; lo escribible
+#   son los PVC declarados y un /tmp efímero.
+# - drop ALL capabilities: ningún servicio necesita privilegios de red ni de FS.
+# - resources: sin límites, un servicio con fuga de memoria se lleva el nodo, y
+#   el nodo se lleva el turno (la mina no puede parar).
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: trazabilidad, namespace: minera-sitio }
@@ -10,7 +18,12 @@ spec:
   template:
     metadata: { labels: { app: trazabilidad } }
     spec:
-      affinity: &anti_afinidad
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -25,13 +38,31 @@ spec:
           env:
             - { name: SITIO_ID, value: sitio-01 }
             - { name: AUTH_MODE, value: oidc }
+            # AUTH_MODE=oidc exige audiencia y emisor: sin ellos un token emitido
+            # para otra aplicación del mismo realm sería aceptado acá.
+            - { name: OIDC_AUDIENCE, value: minera-sitio }
+            - { name: OIDC_ISSUER, value: "https://keycloak.interno/realms/minera" }
+            # Consultas cerradas en producción: la cadena de custodia es dato
+            # regulatorio (regla 7: denegación por defecto).
+            - { name: AUTH_LECTURA, value: exigir }
             - { name: OUTBOX_DIR, value: /var/outbox }
-          volumeMounts: [{ name: outbox, mountPath: /var/outbox }]
+            - { name: AUDIT_DIR, value: /var/auditoria }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          volumeMounts:
+            - { name: outbox, mountPath: /var/outbox }
+            - { name: tmp, mountPath: /tmp }
           readinessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 5 }
           livenessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 15 }
       volumes:
         - name: outbox
           persistentVolumeClaim: { claimName: outbox-compartida }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -48,6 +79,11 @@ spec:
   template:
     metadata: { labels: { app: ingesta } }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
           image: registry.interno/minera/ingesta:0.1.0
@@ -58,15 +94,24 @@ spec:
             - { name: OUTBOX_DIR, value: /var/outbox }
             - { name: MQTT_HOST, value: mqtt }
             - { name: KAFKA_BOOTSTRAP, value: "redpanda:9092" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
           volumeMounts:
             - { name: cola, mountPath: /var/cola }
             - { name: outbox, mountPath: /var/outbox }
+            - { name: tmp, mountPath: /tmp }
           readinessProbe: { httpGet: { path: /health, port: 8001 }, periodSeconds: 5 }
       volumes:
         - name: cola
           persistentVolumeClaim: { claimName: cola-ingesta }
         - name: outbox
           persistentVolumeClaim: { claimName: outbox-compartida }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -82,6 +127,11 @@ spec:
   template:
     metadata: { labels: { app: mantenimiento } }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
           image: registry.interno/minera/mantenimiento:0.1.0
@@ -90,18 +140,30 @@ spec:
           env:
             - { name: SITIO_ID, value: sitio-01 }
             - { name: AUTH_MODE, value: oidc }
+            - { name: OIDC_AUDIENCE, value: minera-sitio }
+            - { name: OIDC_ISSUER, value: "https://keycloak.interno/realms/minera" }
+            - { name: AUTH_LECTURA, value: exigir }
             - { name: KAFKA_BOOTSTRAP, value: "redpanda:9092" }
             - { name: OUTBOX_DIR, value: /var/outbox }
             - { name: AUDIT_DIR, value: /var/auditoria }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
           volumeMounts:
             - { name: outbox, mountPath: /var/outbox }
             - { name: auditoria, mountPath: /var/auditoria }
+            - { name: tmp, mountPath: /tmp }
           readinessProbe: { httpGet: { path: /health, port: 8002 }, periodSeconds: 5 }
       volumes:
         - name: outbox
           persistentVolumeClaim: { claimName: outbox-compartida }
         - name: auditoria
           persistentVolumeClaim: { claimName: auditoria-compartida }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -117,6 +179,11 @@ spec:
   template:
     metadata: { labels: { app: despacho } }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
           image: registry.interno/minera/despacho:0.1.0
@@ -125,17 +192,29 @@ spec:
           env:
             - { name: SITIO_ID, value: sitio-01 }
             - { name: AUTH_MODE, value: oidc }
+            - { name: OIDC_AUDIENCE, value: minera-sitio }
+            - { name: OIDC_ISSUER, value: "https://keycloak.interno/realms/minera" }
+            - { name: AUTH_LECTURA, value: exigir }
             - { name: OUTBOX_DIR, value: /var/outbox }
             - { name: AUDIT_DIR, value: /var/auditoria }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
           volumeMounts:
             - { name: outbox, mountPath: /var/outbox }
             - { name: auditoria, mountPath: /var/auditoria }
+            - { name: tmp, mountPath: /tmp }
           readinessProbe: { httpGet: { path: /health, port: 8003 }, periodSeconds: 5 }
       volumes:
         - name: outbox
           persistentVolumeClaim: { claimName: outbox-compartida }
         - name: auditoria
           persistentVolumeClaim: { claimName: auditoria-compartida }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service

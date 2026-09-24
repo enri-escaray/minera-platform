@@ -11,7 +11,7 @@ from minera_comun import emitir_token_dev
 def entorno(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTBOX_DIR", str(tmp_path / "outbox"))
     monkeypatch.setenv("AUTH_MODE", "dev")
-    monkeypatch.setenv("AUTH_SECRET", "secreto-test")
+    monkeypatch.setenv("AUTH_SECRET", "secreto-de-test-no-usar-en-produccion")
 
 
 @pytest.fixture()

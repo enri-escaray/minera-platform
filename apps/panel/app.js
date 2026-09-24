@@ -102,9 +102,15 @@ async function pintarLotes() {
 
 /* --- Reporte del turno en curso (P2 bajo demanda) --- */
 function turnoActual() {
+  // El turno se etiqueta con el día en que EMPEZÓ (misma convención que el
+  // scheduler de reportes). Para la noche eso importa: entre medianoche y las
+  // 07:00 el turno en curso arrancó ayer a las 19:00, así que pedirlo con la
+  // fecha de hoy devolvía una ventana futura y el panel mostraba 0 toneladas.
   const ahora = new Date();
   const h = ahora.getUTCHours(); // los turnos del scheduler corren en UTC (pendiente: hora local del sitio)
-  return { fecha: ahora.toISOString().slice(0, 10), turno: h >= 7 && h < 19 ? "dia" : "noche" };
+  const base = new Date(ahora);
+  if (h < 7) base.setUTCDate(base.getUTCDate() - 1);
+  return { fecha: base.toISOString().slice(0, 10), turno: h >= 7 && h < 19 ? "dia" : "noche" };
 }
 
 async function pintarTurno() {

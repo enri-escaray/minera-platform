@@ -27,16 +27,19 @@ class EstadoCamion(str, Enum):
 
 
 class Pala(BaseModel):
-    id: str
-    ubicacion_id: str
-    tiempo_carga_min: float = Field(gt=0)
-    prioridad_mezcla: int = Field(ge=0, default=0, description="mayor = más urgente para el plan de mezcla")
+    id: str = Field(min_length=1, max_length=64)
+    ubicacion_id: str = Field(min_length=1, max_length=64)
+    # Cotas superiores además de gt=0: `float` acepta infinito, y un infinito en
+    # tiempo_carga_min o capacidad_ton envenena el cálculo de espera y el motivo
+    # explicable que queda escrito en la auditoría.
+    tiempo_carga_min: float = Field(gt=0, le=1440)
+    prioridad_mezcla: int = Field(ge=0, le=1000, default=0, description="mayor = más urgente para el plan de mezcla")
     activa: bool = True
 
 
 class Camion(BaseModel):
-    id: str
-    capacidad_ton: float = Field(gt=0)
+    id: str = Field(min_length=1, max_length=64)
+    capacidad_ton: float = Field(gt=0, le=1000)
     estado: EstadoCamion = EstadoCamion.disponible
 
 
