@@ -1,5 +1,5 @@
 """Tests del servicio: idempotencia, cadena de custodia, RBAC, errores de dominio."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 
@@ -125,3 +125,77 @@ def test_listar_pesajes_por_rango(client, token_operador):
     r = client.get("/pesajes", params={"desde": "2026-07-18T07:00:00Z",
                                        "hasta": "2026-07-18T19:00:00Z"})
     assert [p["masa_kg"] for p in r.json()] == [100.0, 200.0]  # el de las 20:00 queda fuera
+
+
+# --------------------------------------------------- límites de entrada (DoS)
+
+def test_masa_infinita_rechazada(client, token_operador):
+    """`float` acepta Infinity y el parser de Python lo admite como literal
+    (JSON estándar no, pero json.loads sí). Sin cota superior, un `Infinity`
+    entraba a la cadena de custodia y envenenaba todo total de masa aguas abajo.
+    Se manda el cuerpo crudo justamente porque un cliente honesto no puede
+    serializarlo — el atacante no usa un cliente honesto."""
+    lote = crear_lote(client, token_operador, codigo="LT-INF")
+    cuerpo = (
+        '{"event_id": "%s", "lote_id": "%s", "instrumento_id": "b-1", '
+        '"masa_kg": Infinity, "medido_en": "%s"}'
+        % (uuid4(), lote["id"], datetime.now(timezone.utc).isoformat())
+    )
+    r = client.post("/pesajes", headers={**auth(token_operador),
+                                         "Content-Type": "application/json"},
+                    content=cuerpo)
+    assert r.status_code == 422
+
+
+def test_lotes_origen_acotado(client, token_operador):
+    """El grafo de custodia se recorre recursivamente: un fan-out sin techo
+    convierte un GET de custodia en una amplificación contra la base."""
+    r = client.post("/lotes", headers=auth(token_operador), json={
+        "codigo": "LT-FANOUT", "tipo": "stock",
+        "lotes_origen": [str(uuid4()) for _ in range(101)]})
+    assert r.status_code == 422
+
+
+def test_import_de_bloques_acotado(client):
+    from minera_comun import emitir_token_dev
+    bloque = {"id": "B", "centroide_x": 1.0, "centroide_y": 2.0, "cota": 3000.0,
+              "leyes_estimadas": {"cu_pct": 0.8}}
+    r = client.post("/bloques/importar",
+                    headers=auth(emitir_token_dev("geo", ["geologia.importar"])),
+                    json={"origen_modelo": "m", "bloques": [bloque] * 50_001})
+    assert r.status_code == 422
+
+
+def test_rango_de_pesajes_invertido_es_422(client):
+    ahora = datetime.now(timezone.utc)
+    r = client.get("/pesajes", params={"desde": ahora.isoformat(),
+                                       "hasta": (ahora - timedelta(days=1)).isoformat()})
+    assert r.status_code == 422
+
+
+def test_rango_de_pesajes_excesivo_es_422(client):
+    ahora = datetime.now(timezone.utc)
+    r = client.get("/pesajes", params={"desde": (ahora - timedelta(days=400)).isoformat(),
+                                       "hasta": ahora.isoformat()})
+    assert r.status_code == 422
+
+
+def test_custodia_acota_el_trabajo_por_consulta(client, token_operador):
+    """Con mezclas en rombo el mismo subárbol se reexplora por cada camino.
+    El presupuesto trunca la respuesta antes de que la consulta voltee el servicio."""
+    from app.main import MAX_NODOS_CUSTODIA
+
+    base = [crear_lote(client, token_operador, codigo=f"LT-B{i}")["id"] for i in range(6)]
+    nivel = base
+    for capa in range(4):
+        nivel = [crear_lote(client, token_operador, codigo=f"LT-C{capa}-{i}",
+                            lotes_origen=nivel)["id"] for i in range(6)]
+    cima = crear_lote(client, token_operador, codigo="LT-CIMA", lotes_origen=nivel)
+
+    r = client.get(f"/lotes/{cima['id']}/custodia")
+    assert r.status_code == 200
+
+    def contar(nodo):
+        return 1 + sum(contar(o) for o in nodo["origenes"])
+
+    assert contar(r.json()) <= MAX_NODOS_CUSTODIA + 1

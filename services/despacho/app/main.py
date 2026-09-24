@@ -9,7 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from minera_comun import Principal, auditar, publicar_evento, requerir_rol
+from minera_comun import (
+    Principal,
+    auditar,
+    publicar_evento,
+    registrar_errores_de_validacion,
+    requerir_lectura,
+    requerir_rol,
+    verificar_configuracion,
+)
 
 from .models import (
     Asignacion,
@@ -29,6 +37,8 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fallo cerrado: con auth mal configurada el servicio no llega a 'ready'.
+    verificar_configuracion()
     app.state.pool = None
     database_url = os.getenv("DATABASE_URL")
     if database_url:
@@ -47,6 +57,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Despacho", version="0.1.0", lifespan=lifespan)
+registrar_errores_de_validacion(app)
 
 # Panel de sitio (apps/panel): solo consultas, mismo patrón de CORS que reportes.
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",") if o.strip()]
@@ -78,7 +89,7 @@ async def health():
 
 
 @app.get("/estado")
-async def estado():
+async def estado(_=Depends(requerir_lectura("despacho.leer", "despacho.operar", "despacho.configurar"))):
     return await d().estado()
 
 
@@ -94,10 +105,16 @@ async def registrar_camion(camion: Camion, _: Principal = Depends(requerir_rol("
     return camion
 
 
+MAX_PALAS_EN_SOLICITUD = 200  # un rajo grande no llega a 100 palas activas
+
+
 class SolicitudAsignacion(BaseModel):
-    camion_id: str
+    camion_id: str = Field(min_length=1, max_length=64)
+    # Acotado: el diccionario llega del cliente y se recorre por cada asignación.
     viaje_min: dict[str, float] = Field(
-        default_factory=dict, description="minutos de viaje estimados del camión a cada pala"
+        default_factory=dict,
+        max_length=MAX_PALAS_EN_SOLICITUD,
+        description="minutos de viaje estimados del camión a cada pala",
     )
 
 

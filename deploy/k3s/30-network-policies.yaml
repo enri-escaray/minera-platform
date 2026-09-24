@@ -1,6 +1,12 @@
 # Denegación por defecto dentro del namespace (regla 7 del CLAUDE.md):
 # nada habla con nada salvo lo declarado. Los conductos C1-C4 de
 # docs/arquitectura.md se materializan acá.
+#
+# Cómo leer este archivo: en Kubernetes una NetworkPolicy con
+# `policyTypes: [Ingress, Egress]` y reglas vacías deniega ambos sentidos, y las
+# políticas se suman. Por eso **cada conducto necesita las dos mitades**: egress
+# en el cliente e ingress en el servidor. Declarar solo la mitad de ingreso deja
+# el conducto cerrado igual (falla cerrada, pero falla).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: denegar-todo, namespace: minera-sitio }
@@ -8,21 +14,57 @@ spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
 ---
+# DNS: sin esto ningún pod resuelve "db" ni "redpanda" y todo lo demás es
+# irrelevante. Es la excepción transversal al deny-all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: dns-para-todos, namespace: minera-sitio }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# ---------------------------------------------------------------- conducto: base
+# Postgres/Timescale. Tres servicios persisten: trazabilidad (migración 001),
+# mantenimiento (002, índice único del antirrebote) y despacho (003, write-through).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: servicios-a-db, namespace: minera-sitio }
 spec:
   podSelector: { matchLabels: { app: db } }
+  policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector: { matchLabels: { app: trazabilidad } }
+        - podSelector: { matchLabels: { app: mantenimiento } }
+        - podSelector: { matchLabels: { app: despacho } }
       ports: [{ port: 5432 }]
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: egress-a-db, namespace: minera-sitio }
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [trazabilidad, mantenimiento, despacho] }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: db } } }]
+      ports: [{ port: 5432 }]
+---
+# ------------------------------------------------------------------ conducto: bus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: servicios-a-redpanda, namespace: minera-sitio }
 spec:
   podSelector: { matchLabels: { app: redpanda } }
+  policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector: { matchLabels: { app: ingesta } }
@@ -32,9 +74,24 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
+metadata: { name: egress-a-redpanda, namespace: minera-sitio }
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [ingesta, mantenimiento, replicador] }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: redpanda } } }]
+      ports: [{ port: 9092 }]
+---
+# ----------------------------------------------------------------- conducto C1: OT
+# Solo lectura desde la capa OT (regla 3 del CLAUDE.md: nada escribe al PLC).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata: { name: sensores-a-mqtt, namespace: minera-sitio }
 spec:
   podSelector: { matchLabels: { app: mqtt } }
+  policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector: { matchLabels: { app: ingesta } }
@@ -47,10 +104,74 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
+metadata: { name: egress-a-mqtt, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: ingesta } }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: mqtt } } }]
+      ports: [{ port: 1883 }]
+---
+# ------------------------------------------------- conducto: reportes → trazabilidad
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata: { name: reportes-a-trazabilidad, namespace: minera-sitio }
 spec:
   podSelector: { matchLabels: { app: trazabilidad } }
+  policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector: { matchLabels: { app: reportes } }
       ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: egress-reportes-a-trazabilidad, namespace: minera-sitio }
+spec:
+  podSelector: { matchLabels: { app: reportes } }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: trazabilidad } } }]
+      ports: [{ port: 8000 }]
+---
+# ------------------------------------------------------- ingreso de operadores
+# Las APIs de dominio se consumen desde la red de operaciones del sitio a través
+# del ingress controller. Sin esta política, con deny-all activo, ninguna persona
+# alcanza ningún servicio. Ajustar el namespace del controller al del clúster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: ingress-controller-a-apis, namespace: minera-sitio }
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [trazabilidad, mantenimiento, despacho, reportes, ingesta] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { port: 8000 }
+        - { port: 8001 }
+        - { port: 8002 }
+        - { port: 8003 }
+        - { port: 8004 }
+---
+# ------------------------------------------------------ conducto C3: OIDC (IdP)
+# Con AUTH_MODE=oidc los servicios validan firmas contra el JWKS del proveedor.
+# El cliente JWKS cachea las claves (ver libs/comun/minera_comun/seguridad.py),
+# así que un corte del enlace no voltea la autenticación del sitio: este conducto
+# es para refrescar la caché, no para cada request.
+# Reemplazar el ipBlock por el del Keycloak/Entra corporativo.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: egress-a-idp, namespace: minera-sitio }
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [trazabilidad, mantenimiento, despacho, reportes] }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 10.30.0.0/24 }   # VLAN del IdP corporativo
+      ports: [{ protocol: TCP, port: 443 }]

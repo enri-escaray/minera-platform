@@ -94,9 +94,20 @@ minera-platform/
 | `campo.reportar` | registrar novedades desde la PWA de campo |
 | `metalurgia.conciliar` | ejecutar la conciliación de balance de masas (P4) |
 
-`AUTH_MODE=dev` (HS256 + `AUTH_SECRET`) solo en desarrollo; producción usa
-`AUTH_MODE=oidc` contra el JWKS de Keycloak/Entra. Tokens de prueba:
-`python -c "from minera_comun import emitir_token_dev; print(emitir_token_dev('yo', ['*']))"`
+Roles de solo lectura (`trazabilidad.leer`, `mantenimiento.leer`, `despacho.leer`,
+`reportes.leer`); los roles de escritura también habilitan la lectura de su dominio.
+
+**`AUTH_MODE` es obligatorio y no tiene valor por defecto** (ADR-005): si falta, el
+servicio no arranca. `dev` = HS256 con `AUTH_SECRET` (mínimo 32 caracteres, sin
+default); `oidc` = JWKS de Keycloak/Entra y exige además `OIDC_AUDIENCE` y
+`OIDC_ISSUER`. Todo token requiere `exp`. El rol comodín `*` solo concede en `dev`.
+Si el proceso declara `SITIO_ID`, un token de otro sitio se rechaza con 403.
+
+Las consultas van abiertas en `dev` (el panel es estático y sin login) y cerradas
+en `oidc`; `AUTH_LECTURA=exigir|abierta` fuerza cualquiera de las dos.
+
+Tokens de prueba:
+`AUTH_MODE=dev AUTH_SECRET=dev-secret-solo-para-desarrollo-local python -c "from minera_comun import emitir_token_dev; print(emitir_token_dev('yo', ['*']))"`
 
 ## Comandos
 
@@ -157,6 +168,9 @@ python tools/validar_contratos.py
 - [x] Persistencia Postgres de `mantenimiento` (migración 002, índice único parcial que
       garantiza el antirrebote en la base) y de `despacho` (migración 003, write-through +
       `restaurar()` que reconstruye colas y asignaciones vivas tras un reinicio).
+      El compose cablea `DATABASE_URL` en ambos (antes solo trazabilidad: corrían en
+      memoria sin querer). El consumidor Kafka de mantenimiento reintenta la conexión
+      si el broker no está listo al arrancar (antes quedaba pegado para siempre).
 - [x] Evaluador extendido: condición `mayor`/`menor` (umbrales inferiores) y reglas
       compuestas vía `condiciones_adicionales` (contexto de otras métricas del equipo).
 - [x] Servicio `reportes` (P2 + P4): reporte de turno bajo demanda y por scheduler al
@@ -176,11 +190,51 @@ python tools/validar_contratos.py
       (nuevo), `GET /lotes/{id}/custodia` y `GET /reportes/turno`. CORS de solo GET
       en trazabilidad/mantenimiento/despacho (mismo patrón que reportes).
 
+- [x] Demo reproducible: `tools/sembrar_demo.py` (siembra idempotente y consciente del
+      estado, pesajes en el turno en curso) + guion de grabación en
+      `marketing/guion-demo-ejecutable.md` (único guion: comandos, narración y coreografía).
+- [x] Endurecimiento de seguridad (ADR-005). La autenticación falla cerrada:
+      `AUTH_MODE`/`AUTH_SECRET` sin default (antes un olvido de configuración
+      degradaba a un secreto publicado en el repo y cualquiera emitía rol `*`),
+      `exp` obligatorio, `aud`/`iss` validados en OIDC, comodín solo en dev,
+      claim `sitio` verificado, JWKS cacheado (antes un fetch al IdP por request,
+      lo que ataba la autenticación al enlace externo). Suite `libs/comun/tests/`
+      dedicada al borde de auth, en CI como job propio.
+      Límites de entrada en todos los modelos (fan-out de custodia, matriz de
+      viaje, import de bloques, conciliación, novedades en memoria) y cotas
+      superiores en los `float` (aceptaban `Infinity`). Handler de validación
+      común: un `Infinity` en el cuerpo provocaba un 500 no manejado.
+      Contenedores no-root con `securityContext` y límites de recursos; Postgres,
+      Kafka y MQTT solo en loopback en dev.
+      NetworkPolicies corregidas: el deny-all declaraba `Egress` pero ninguna
+      política lo concedía —ni siquiera DNS—, y faltaba el conducto a la base
+      para `mantenimiento` y `despacho`, que persisten desde las migraciones
+      002/003. Tal como estaban, el sitio no levantaba en K3s.
+
+- [x] Fix de turno en el panel, la PWA y el sembrador: el turno se etiqueta con
+      el día en que EMPEZÓ (convención que el scheduler de `reportes` ya usaba).
+      Entre medianoche y las 07:00 UTC los tres pedían la noche con la fecha de
+      hoy —una ventana futura— y el panel mostraba 0 toneladas en "Turno en
+      curso". Verificado en vivo sobre el stack levantado.
+      `apps/campo/sw.js` es cache-first: subir `CACHE` en cada cambio del shell.
+
 ### Pendiente (siguiente iteración — sé honesto con esto al retomar)
+- [ ] Política de re-registro de equipos en despacho: el alta repetida de un camión
+      pisa su estado (el índice único de la base frena el duplicado con 500; debería
+      ser un error de dominio 409 o conservar el estado).
 - [ ] Persistencia Postgres de novedades en `reportes` (hoy memoria; el evento ya viaja a nube)
 - [ ] Job automático de conciliación P4 alimentado por `proceso_planta` (hoy es endpoint manual)
 - [ ] Hora local del sitio en el scheduler de turnos (hoy UTC)
 - [ ] Panel Grafana con `cola_pendientes` y tasa de OTs como primeras métricas
+- [ ] El panel de sitio no funciona contra un sitio en `oidc` (lectura cerrada):
+      necesita que el operador aporte un token
+- [ ] `SERVICIO_TOKEN` es un token estático de larga vida; falta el flujo
+      *client credentials* con refresco automático contra el IdP (ADR propio)
+- [ ] Sin límite de tasa (rate limiting) en ninguna API: un cliente autenticado
+      puede saturar un servicio del sitio
+- [ ] La auditoría JSONL es append-only por convención, no por construcción:
+      quien pueda escribir el PVC puede editarla. Para la afirmación de
+      "auditoría inmutable" regulatoria falta encadenamiento por hash
 
 ## Cómo pedir ayuda a Claude Code en este repo
 

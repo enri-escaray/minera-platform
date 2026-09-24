@@ -15,7 +15,7 @@ def entorno(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTBOX_DIR", str(tmp_path / "outbox"))
     monkeypatch.setenv("AUDIT_DIR", str(tmp_path / "auditoria"))
     monkeypatch.setenv("AUTH_MODE", "dev")
-    monkeypatch.setenv("AUTH_SECRET", "secreto-test")
+    monkeypatch.setenv("AUTH_SECRET", "secreto-de-test-no-usar-en-produccion")
     monkeypatch.setenv("SCHEDULER", "0")  # sin bucle en tests
 
 
@@ -97,3 +97,39 @@ def test_conciliacion_por_api_publica_y_audita(client, entorno, tmp_path):
     outbox = (tmp_path / "outbox" / "outbox.jsonl").read_text()
     assert "conciliacion.alerta" in outbox
     assert "conciliacion.ejecutada" in (tmp_path / "auditoria" / "auditoria.jsonl").read_text()
+
+
+# --------------------------------------------------- límites y errores de entrada
+
+def test_fecha_invalida_es_422_no_500(client):
+    """`fecha` iba directo a datetime.fromisoformat: una fecha basura convertía
+    un error del cliente en un error del servidor."""
+    r = client.get("/reportes/turno", params={"fecha": "no-es-fecha", "turno": "dia"})
+    assert r.status_code == 422
+
+
+def test_novedad_con_fecha_libre_rechazada(client):
+    r = client.post("/novedades", headers=auth("campo.reportar"), json={
+        "event_id": str(uuid4()), "turno": "dia", "fecha": "18/07/2026",
+        "categoria": "seguridad", "texto": "prueba de formato"})
+    assert r.status_code == 422
+
+
+def test_conciliacion_acotada(client):
+    balance = {"lote_id": "L-1", "masa_entrada_kg": 100.0, "masa_salida_kg": 90.0}
+    r = client.post("/conciliaciones", headers=auth("metalurgia.conciliar"),
+                    json=[balance] * 5_001)
+    assert r.status_code == 422
+
+
+def test_novedades_en_memoria_acotadas():
+    """Sin techo, un dispositivo con event_id nuevo en cada reintento hace
+    crecer el diccionario hasta voltear el proceso."""
+    from app.main import RepoNovedades
+    from app.models import Novedad
+
+    repo = RepoNovedades(maximo=10)
+    for i in range(50):
+        repo.guardar(Novedad(turno="dia", fecha="2026-07-18", categoria="otro",
+                             texto=f"novedad {i}"))
+    assert len(repo._novedades) == 10

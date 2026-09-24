@@ -10,7 +10,7 @@ def entorno(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTBOX_DIR", str(tmp_path / "outbox"))
     monkeypatch.setenv("AUDIT_DIR", str(tmp_path / "auditoria"))
     monkeypatch.setenv("AUTH_MODE", "dev")
-    monkeypatch.setenv("AUTH_SECRET", "secreto-test")
+    monkeypatch.setenv("AUTH_SECRET", "secreto-de-test-no-usar-en-produccion")
 
 
 @pytest.fixture()
@@ -133,3 +133,22 @@ def test_restaurar_reconstruye_estado_del_rajo():
         assert (await d.estado())["en_cola"]["pala-01"] == 1
 
     asyncio.run(correr())
+
+
+# --------------------------------------------------- límites de entrada (DoS)
+
+def test_matriz_de_viaje_acotada(client, rajo):
+    """`viaje_min` llega del cliente y se recorre en cada asignación."""
+    r = client.post("/asignaciones", headers=auth("despacho.operar"), json={
+        "camion_id": "cam-01",
+        "viaje_min": {f"pala-{i}": 1.0 for i in range(201)}})
+    assert r.status_code == 422
+
+
+def test_capacidad_infinita_rechazada(client):
+    """`float` con solo gt=0 acepta Infinity; envenena el cálculo de espera y
+    el motivo explicable que queda escrito en la auditoría."""
+    r = client.post("/camiones", headers={**auth("despacho.configurar"),
+                                          "Content-Type": "application/json"},
+                    content='{"id": "cam-inf", "capacidad_ton": Infinity}')
+    assert r.status_code == 422

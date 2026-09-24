@@ -65,7 +65,19 @@ async function actualizarUI() {
     navigator.onLine ? "En línea" : "Sin conexión: se guarda localmente";
 }
 
-document.getElementById("fecha").value = new Date().toISOString().slice(0, 10);
+/* Precarga el turno EN CURSO, no la fecha de hoy: el turno se etiqueta con el
+ * día en que empezó, así que entre medianoche y las 07:00 la noche en curso
+ * arrancó ayer. Con la fecha de hoy la novedad quedaba fuera del reporte del
+ * turno que el operador está viviendo — el error más fácil de cometer y el
+ * más difícil de notar desde el campo. */
+(function precargarTurnoEnCurso() {
+  const ahora = new Date();
+  const h = ahora.getUTCHours();
+  const base = new Date(ahora);
+  if (h < 7) base.setUTCDate(base.getUTCDate() - 1);
+  document.getElementById("fecha").value = base.toISOString().slice(0, 10);
+  document.getElementById("turno").value = h >= 7 && h < 19 ? "dia" : "noche";
+})();
 document.getElementById("enviar").addEventListener("click", async () => {
   const novedad = {
     event_id: crypto.randomUUID(),

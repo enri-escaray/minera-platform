@@ -27,3 +27,6 @@ env/
 # SO
 Thumbs.db
 .DS_Store
+
+# Kit de ventas (solo local, no se publica)
+marketing/

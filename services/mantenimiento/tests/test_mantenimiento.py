@@ -23,7 +23,7 @@ def entorno(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTBOX_DIR", str(tmp_path / "outbox"))
     monkeypatch.setenv("AUDIT_DIR", str(tmp_path / "auditoria"))
     monkeypatch.setenv("AUTH_MODE", "dev")
-    monkeypatch.setenv("AUTH_SECRET", "secreto-test")
+    monkeypatch.setenv("AUTH_SECRET", "secreto-de-test-no-usar-en-produccion")
     yield tmp_path
 
 
@@ -168,3 +168,39 @@ def test_regla_compuesta_exige_contexto(client):
     inyectar([("cam-101", "velocidad_kmh", 31.0)])
     ots = inyectar([("cam-101", "carga_ton", 254)])
     assert len(ots) == 1 and ots[0].regla_id == "sobrecarga-a-velocidad"
+
+
+def test_kafka_fuente_reintenta_start_tras_broker_caido(monkeypatch):
+    """Si el broker no está al arrancar (arranque del sitio), el próximo intento
+    debe volver a start(); un consumidor a medio construir no puede quedar pegado."""
+    import asyncio
+    import sys
+    import types
+
+    intentos = {"start": 0, "stop": 0}
+
+    class ConsumidorFalso:
+        def __init__(self, *a, **k): ...
+        async def start(self):
+            intentos["start"] += 1
+            if intentos["start"] == 1:
+                raise ConnectionError("broker no disponible")
+        async def stop(self):
+            intentos["stop"] += 1
+        async def getone(self):
+            return types.SimpleNamespace(value=json.dumps({"ok": True}).encode())
+
+    monkeypatch.setitem(sys.modules, "aiokafka",
+                        types.SimpleNamespace(AIOKafkaConsumer=ConsumidorFalso))
+    from app.main import KafkaFuente
+
+    fuente = KafkaFuente("redpanda:9092", "telemetria.equipos")
+
+    async def correr():
+        with pytest.raises(ConnectionError):
+            await fuente.consumir()          # primer intento: broker caído
+        assert fuente._consumer is None      # no queda un consumidor roto
+        assert intentos["stop"] == 1         # el fallido se limpió
+        assert await fuente.consumir() == {"ok": True}  # reintento: reconecta y consume
+
+    asyncio.run(correr())
