@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Prueba de concepto · cámara y reconocimiento</title>
+<style>
+  body { margin: 0; background: #22262E; color: #E6E8EC; font: 13px "Segoe UI", Arial, sans-serif; }
+  #barra { display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #2A2E36; border-bottom: 2px solid #C9803E; }
+  #barra button { background: #C9803E; color: #fff; border: 0; border-radius: 4px; padding: 6px 14px; font-weight: 700; cursor: pointer; }
+  #barra button:disabled { opacity: .5; cursor: default; }
+  #vista { display: block; width: 960px; height: 540px; }
+  #resultados { margin: 0; padding: 12px; white-space: pre-wrap; font: 12px Consolas, monospace; }
+</style>
+<!-- Todo local (modo isla): nada se carga desde internet -->
+<script type="importmap">{ "imports": { "three": "../web/vendor/three/three.module.js" } }</script>
+<script src="../web/vendor/tfjs/tf.min.js"></script>
+<script src="../web/vendor/coco-ssd/coco-ssd.min.js"></script>
+</head>
+<body>
+  <div id="barra">
+    <button id="medir" disabled>Medir</button>
+    <label><input type="checkbox" id="niebla"> niebla</label>
+    <label>distancia <input type="range" id="dist" min="5" max="40" step="5" value="15"> <span id="distTxt">15 m</span></label>
+    <span id="estado">cargando…</span>
+  </div>
+  <canvas id="vista" width="960" height="540"></canvas>
+  <pre id="resultados"></pre>
+  <script type="module" src="camara.js"></script>
+</body>
+</html>

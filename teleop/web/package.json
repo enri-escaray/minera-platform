@@ -1,0 +1,6 @@
+{
+  "name": "mineral360-teleop-web",
+  "private": true,
+  "type": "module",
+  "description": "Zona de control simulada del hackatón: núcleo JS sin dependencias, probado con node --test"
+}

@@ -1,0 +1,72 @@
+{
+  "coco-ssd/LICENSE": {
+    "url": "https://raw.githubusercontent.com/tensorflow/tfjs-models/master/LICENSE",
+    "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+    "bytes": 11357
+  },
+  "coco-ssd/coco-ssd.min.js": {
+    "url": "https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js",
+    "sha256": "8875b8c1bb57723990c9d6506226e0e51cd21b8b6943eb53201086096de52df5",
+    "bytes": 9299
+  },
+  "modelos/ssdlite_mobilenet_v2/group1-shard1of5": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/group1-shard1of5",
+    "sha256": "0e7af0f713e98521252321f7f84892c31cefccccec3ac64c84e5065b75ed5646",
+    "bytes": 4194304
+  },
+  "modelos/ssdlite_mobilenet_v2/group1-shard2of5": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/group1-shard2of5",
+    "sha256": "74cc6cfc2c4510c9cd81b8ad4cebf6f6a8f305119bb365ce0eb96276da38519a",
+    "bytes": 4194304
+  },
+  "modelos/ssdlite_mobilenet_v2/group1-shard3of5": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/group1-shard3of5",
+    "sha256": "50383033f893eae136392a403e8f70ade5efd90867df5695c4ca5ac640e14f38",
+    "bytes": 4194304
+  },
+  "modelos/ssdlite_mobilenet_v2/group1-shard4of5": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/group1-shard4of5",
+    "sha256": "d856dc534c780068bbf6c666ce1516df2c8433d87578aa31fcdf197de7058cc2",
+    "bytes": 4194304
+  },
+  "modelos/ssdlite_mobilenet_v2/group1-shard5of5": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/group1-shard5of5",
+    "sha256": "3d356f1fb6dfca6af78c56db34d9326706d0196e303f9de6b04f236ca79ed309",
+    "bytes": 1257312
+  },
+  "modelos/ssdlite_mobilenet_v2/model.json": {
+    "url": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json",
+    "sha256": "3770b2528339b1e3340cb74360e1e40401816b009779aeb8d0cce3a4353ea3a9",
+    "bytes": 527315
+  },
+  "tfjs/LICENSE": {
+    "url": "https://raw.githubusercontent.com/tensorflow/tfjs/master/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "bytes": 11358
+  },
+  "tfjs/tf.min.js": {
+    "url": "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js",
+    "sha256": "300dfae273d20b4046f46a06d735688f03675a807561e9bcb5f664eb2f3d2831",
+    "bytes": 1469843
+  },
+  "three/LICENSE": {
+    "url": "https://cdn.jsdelivr.net/npm/three@0.186.1/LICENSE",
+    "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+    "bytes": 1081
+  },
+  "three/addons/OrbitControls.js": {
+    "url": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/controls/OrbitControls.js",
+    "sha256": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+    "bytes": 40755
+  },
+  "three/three.core.js": {
+    "url": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.core.js",
+    "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+    "bytes": 1458113
+  },
+  "three/three.module.js": {
+    "url": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+    "bytes": 662772
+  }
+}

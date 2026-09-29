@@ -30,3 +30,13 @@ Thumbs.db
 
 # Kit de ventas (solo local, no se publica)
 marketing/
+
+# Teleoperación (hackatón): librerías y modelo (22 MB) se restauran verificados
+# con `python tools/vendorizar_teleop.py`; en git quedan solo la lista y las huellas.
+teleop/web/vendor/*
+!teleop/web/vendor/LICENCIAS.md
+!teleop/web/vendor/vendor.lock.json
+# Fotos de personas del simulador: nunca al repo público (consentimiento y privacidad)
+teleop/web/maquina/personas/
+# Tokens de desarrollo generados para las consolas
+teleop/web/config.local.js

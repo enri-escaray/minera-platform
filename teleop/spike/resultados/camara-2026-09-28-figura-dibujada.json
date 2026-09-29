@@ -1,0 +1,35 @@
+{
+  "nota": "Medición con la figura dibujada: NO representa la detección con fotos reales (el detector la toma por un semáforo). Sirve para validar el circuito, los tiempos, los falsos positivos y el peso del JPEG.",
+  "fecha": "2026-09-28T22:55:08.793Z",
+  "equipo": "i5-11300H, Intel Iris Xe (ANGLE D3D11), 7,7 GB RAM; navegador integrado de la app de Claude",
+  "backend": "webgl",
+  "fuente_personas": "figura dibujada (sin fotos todavía)",
+  "umbral": 0.35,
+  "cuadros_por_caso": 4,
+  "render": "960x540",
+  "fov_horizontal": 70,
+  "altura_camara_m": 3,
+  "tasa": {
+    "A": {"5": {"sin_niebla": 0, "con_niebla": 0}, "10": {"sin_niebla": 0, "con_niebla": 0}, "15": {"sin_niebla": 0, "con_niebla": 0}, "20": {"sin_niebla": 0, "con_niebla": 0}, "25": {"sin_niebla": 0.25, "con_niebla": 0}, "30": {"sin_niebla": 0.13, "con_niebla": 0}, "35": {"sin_niebla": 0.13, "con_niebla": 0}, "40": {"sin_niebla": 0.75, "con_niebla": 0}},
+    "B": {"5": {"sin_niebla": 0, "con_niebla": 0}, "10": {"sin_niebla": 0, "con_niebla": 0}, "15": {"sin_niebla": 0, "con_niebla": 0}, "20": {"sin_niebla": 0, "con_niebla": 0}, "25": {"sin_niebla": 0, "con_niebla": 0}, "30": {"sin_niebla": 0.13, "con_niebla": 0}, "35": {"sin_niebla": 0.25, "con_niebla": 0}, "40": {"sin_niebla": 0.88, "con_niebla": 0}},
+    "C": {"5": {"sin_niebla": 0, "con_niebla": 0}, "10": {"sin_niebla": 0, "con_niebla": 0}, "15": {"sin_niebla": 0, "con_niebla": 0}, "20": {"sin_niebla": 0, "con_niebla": 0}, "25": {"sin_niebla": 0, "con_niebla": 0}, "30": {"sin_niebla": 0.63, "con_niebla": 0}, "35": {"sin_niebla": 0.25, "con_niebla": 0}, "40": {"sin_niebla": 0.88, "con_niebla": 0}},
+    "R": {"5": {"sin_niebla": 0, "con_niebla": 0}, "10": {"sin_niebla": 0, "con_niebla": 0}, "15": {"sin_niebla": 0, "con_niebla": 0}, "20": {"sin_niebla": 0, "con_niebla": 0}, "25": {"sin_niebla": 0, "con_niebla": 0}, "30": {"sin_niebla": 0, "con_niebla": 0}, "35": {"sin_niebla": 0, "con_niebla": 0}, "40": {"sin_niebla": 0, "con_niebla": 0}}
+  },
+  "falsos_positivos_por_100": {
+    "A": {"sin_niebla": 0, "con_niebla": 0}, "B": {"sin_niebla": 0, "con_niebla": 0},
+    "C": {"sin_niebla": 0, "con_niebla": 0}, "R": {"sin_niebla": 0, "con_niebla": 0}
+  },
+  "ms_por_deteccion": {
+    "A": {"mediana": 65.2, "p90": 94.8}, "B": {"mediana": 66.7, "p90": 68.2},
+    "C": {"mediana": 66.6, "p90": 67.8}, "R": {"mediana": 66.8, "p90": 82.2}
+  },
+  "jpeg_bytes": {"A": 4220, "B": 2818, "C": 1789},
+  "ms_por_render": 0.3,
+  "fps_render_max": 2912.6,
+  "diagnostico_umbral_0_05": {
+    "5 m": ["traffic light 0.08 [441,419,82,117]"],
+    "10 m": ["traffic light 0.10 [464,342,40,96]", "traffic light 0.07 [315,208,107,67]"],
+    "25 m": ["person 0.10 [472,278,19,45]", "truck 0.05 [319,209,102,66]"]
+  },
+  "modelo_carga_ms": {"primera_vez": 44385, "con_cache_de_shaders": 4685}
+}
